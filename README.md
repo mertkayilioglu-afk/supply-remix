@@ -104,12 +104,36 @@ The question this project answers: *how would I rebuild an Excel/VBA/Power BI wo
 ```bash
 pip install -r requirements.txt
 python scripts/make_sample_data.py          # synthetic order book -> data/sample_order_book.json
-python -m pytest -q                         # 133 tests
-uvicorn app.api.main:app --reload           # interactive docs at http://127.0.0.1:8000/docs
+python -m pytest -q                         # 146 tests
+uvicorn app.api.main:app --reload           # API docs at /docs, review dashboard at /dashboard
 export ANTHROPIC_API_KEY=...                # optional: model-based routing and phrasing
 ```
 
 Example: `POST /remix` with the contents of `data/sample_order_book.json` plus `"target_order_number": "SO-100203"`.
+
+## Dashboard
+
+A small review page for the staged flow, from one template in two forms:
+
+* **Live:** `GET /dashboard` on the running API. Each step is a deliberate click that calls ONE stage:
+  rank at-risk orders (`/analyze`), then the container plan for the one order you pick (`/dashboard/plan`), then,
+  optionally, a text preview of the draft customer email (`/dashboard/email-preview`). Nothing runs on page load,
+  and no stage starts the next.
+* **Static:** `python scripts/build_static_dashboard.py` writes `docs/dashboard/index.html` with a pre-computed
+  snapshot of the sample data (the full ranking, plus plans for the top orders and one example of each outcome), so
+  it works on GitHub Pages without a server. A test checks the committed file matches a fresh build.
+* **GitHub Pages:** `https://mertkayilioglu-afk.github.io/supply-remix/dashboard/` *(placeholder: live once Pages is
+  enabled for the `main` branch, `/docs` folder).*
+
+What the page shows: ranked orders (order, customer, coefficient, status); one card per container with a fill bar
+that marks the minimum load, an OK/NOK badge (icon and text, not colour alone), ready date, units OK, and Net Amount;
+the plain-language reason when there is no proposal, and which category was not split in a partial one; and a
+"Why this plan" box with the assistant layer's explanation. Every figure comes from the engine or `app/config/`;
+the page itself contains none. There is no send button: the email appears only as a draft preview.
+
+Note: container numbers follow the engine's earliest-first fill order, not the ready date, so a later container can
+occasionally be ready before an earlier one. Balancing can move a unit between containers, but the balancing delay
+guard (see "Known limits and next steps") stops it from delaying any container by more than 21 days.
 
 ## Layout
 
@@ -117,9 +141,10 @@ Example: `POST /remix` with the contents of `data/sample_order_book.json` plus `
 app/config/        every tunable value (generator, tolerance, scoring weights, remix rules)
 app/data/          models and the synthetic data generator (seeded, reproducible)
 app/core/          splitter, scoring, remix, StageError
-app/presentation/  pivot (HTML/Excel), customer document, email draft, contact lookup
+app/presentation/  pivot (HTML/Excel), customer document, email draft, contact lookup, dashboard template
 app/ai/            natural-language router and explainer
-app/api/           FastAPI app and Pydantic schemas
+app/api/           FastAPI app, dashboard routes and Pydantic schemas
+docs/dashboard/    static build of the dashboard (GitHub Pages)
 tests/             unit tests, including a bounds property test on generated data
 ```
 

@@ -1,6 +1,6 @@
 # CLAUDE.md -- project instructions for Claude Code
 
-Read README.md and docs/AI_WORKFLOW.md first, then run `python -m pytest -q` (expect 133 passing) before changing anything.
+Read README.md and docs/AI_WORKFLOW.md first, then run `python -m pytest -q` (expect 146 passing) before changing anything.
 
 ## What this is
 A self-directed personal portfolio project on synthetic data (never claim otherwise; no employer data). It rebuilds, in
@@ -36,6 +36,8 @@ engineering quality are.
 - On the sample data, 23 of 61 at-risk orders can be containerised; 33 fail on volume, 5 are mixed. This is by design.
 - Working-day calendar: built, off by default (app/config/calendar_config.py); shifts availability dates only.
 - MILP packer: built behind RemixConfig.packer="milp" (default greedy); comparison in docs/packer_comparison.md.
+- Dashboard: GET /dashboard (live) and docs/dashboard/index.html (static, rebuild with
+  scripts/build_static_dashboard.py; a test fails if it is stale). Each stage is a deliberate click.
 - n8n example: docs/n8n/, UNTESTED design example (structure checked by tests/test_n8n_example.py only).
 - The repair step borrows from LATER containers only after borrowing from earlier ones fails. Mention this in the README if touched.
 

@@ -38,7 +38,7 @@ from app.api.schemas import (
     ShipmentContainerOut,
     StageErrorResponse,
 )
-from app.ai.assistant import default_llm, explain, route_request
+from app.ai.assistant import LLM, default_llm, explain, route_request
 from app.core.errors import StageError
 from app.core.remix import RemixResult, ShipmentContainer, remix_order
 from app.core.scoring import score_orders
@@ -51,7 +51,7 @@ from app.data.models import (
     OrderLine,
     ProductionFeedbackEntry,
 )
-from app.presentation.contacts import generate_synthetic_contact_directory, resolve_contact
+from app.presentation.contacts import Contact, generate_synthetic_contact_directory, resolve_contact
 from app.presentation.email_draft import render_proposal_email
 from app.presentation.pivot import render_pivot_html
 from app.presentation.pivot_export import render_pivot_workbook
@@ -463,24 +463,7 @@ def remix_proposal_document(request: ProposalRequest) -> Response:
 )
 def remix_proposal_email(request: ProposalRequest) -> Response:
     result, target = _run_remix_for_order(request)
-
-    # Build a minimal customer directory from the request's own order
-    # lines (customer_id -> customer_name), since the API doesn't carry
-    # a full Customer record — the contact directory only ever needed
-    # those two fields.
-    customers_by_id: dict[str, Customer] = {}
-    for line_in in request.order_lines:
-        customers_by_id.setdefault(
-            line_in.customer_id,
-            Customer(
-                customer_id=line_in.customer_id,
-                customer_name=line_in.customer_name,
-                region="",
-                preferred_categories=(),
-            ),
-        )
-    directory = generate_synthetic_contact_directory(list(customers_by_id.values()))
-    contact = resolve_contact(directory, result.customer_id)
+    contact = resolve_customer_contact(request.order_lines, result.customer_id)
 
     workbook_bytes = render_proposal_workbook(result, target)
     attachment_filename = f"proposal_{target.order_number}.xlsx"
@@ -532,6 +515,15 @@ def assistant(request: AssistantRequest) -> AssistantResponse:
         return AssistantResponse(**base, result=res, explanation=explain(facts, template, llm),
                                  next_step="Pick one order and ask to remix it.")
     res = remix(RemixRequest(order_lines=request.order_lines, target_order_number=intent.order_number, as_of_date=request.as_of_date))
+    explanation, _ = remix_explanation(res, llm)
+    return AssistantResponse(**base, result=res, explanation=explanation,
+                             next_step="Review, then request the customer document/email deliberately.")
+
+
+def remix_explanation(res: RemixResponse, llm: LLM | None) -> tuple[str, str]:
+    """Plain-language explanation of a remix result, shared by /assistant and
+    the dashboard. Returns (text, source) where source is "template" or "model".
+    The model may only restate engine numbers (see app.ai.assistant.explain)."""
     if res.containers:
         template = f"Order {res.target_order_number} splits into {len(res.containers)} containers: " + "; ".join(
             f"#{c.index} {c.status} {c.utilization:.1%} full" for c in res.containers) + "."
@@ -539,10 +531,34 @@ def assistant(request: AssistantRequest) -> AssistantResponse:
         template = res.message or "No proposal."
     facts = {"containers": [c.model_dump(mode="json", exclude={"lines"}) for c in res.containers],
              "no_proposal_reason": res.no_proposal_reason, "message": res.message}
-    return AssistantResponse(**base, result=res, explanation=explain(facts, template, llm),
-                             next_step="Review, then request the customer document/email deliberately.")
+    text = explain(facts, template, llm)
+    return text, ("template" if text == template else "model")
+
+
+def resolve_customer_contact(order_lines: list[OrderLineIn], customer_id: str) -> Contact:
+    """Synthetic contact for a customer, built from the request's own order lines
+    (the API carries no full Customer record). Fails visibly if none is on file."""
+    customers_by_id: dict[str, Customer] = {}
+    for line_in in order_lines:
+        customers_by_id.setdefault(
+            line_in.customer_id,
+            Customer(
+                customer_id=line_in.customer_id,
+                customer_name=line_in.customer_name,
+                region="",
+                preferred_categories=(),
+            ),
+        )
+    directory = generate_synthetic_contact_directory(list(customers_by_id.values()))
+    return resolve_contact(directory, customer_id)
 
 
 @app.get("/", include_in_schema=False)
 def root() -> dict[str, str]:
     return {"docs": "/docs"}
+
+
+# Dashboard routes live in their own module; included last so it can reuse the helpers above.
+from app.api.dashboard import router as dashboard_router  # noqa: E402
+
+app.include_router(dashboard_router)

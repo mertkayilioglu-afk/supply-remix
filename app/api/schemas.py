@@ -341,3 +341,43 @@ class StageErrorResponse(BaseModel):
     detail: str = Field(..., description="The full human-readable error message.")
     expected: str | None = Field(None, description="What this stage expected to receive.")
     received: str | None = Field(None, description="What this stage actually received.")
+
+
+# ---------------------------------------------------------------------------
+# Review dashboard (GET /dashboard)
+# ---------------------------------------------------------------------------
+
+
+class NotSplitNote(BaseModel):
+    categories: str = Field(..., description="The target order's categories in the group that was not split.")
+    reason: Literal["insufficient_volume", "cannot_balance"] = Field(..., description="The engine's reason code.")
+    detail: str = Field(..., description="The engine's own explanation for this group.")
+
+
+class DashboardTarget(BaseModel):
+    order_number: str
+    customer_name: str
+    requested_delivery_date: date
+    availability_of_mix: date | None = Field(None, description="Null if any unit is UNPLANNED.")
+
+
+class DashboardPlanResponse(BaseModel):
+    """Step 2 of the dashboard: ONE order's container plan plus its plain-language explanation."""
+
+    target: DashboardTarget
+    remix: RemixResponse
+    explanation: str = Field(..., description="Assistant-layer text; only restates engine numbers.")
+    explanation_source: Literal["template", "model"] = Field(
+        ..., description="'template' = deterministic text (no model, or the model's text was rejected)."
+    )
+    no_proposal_headline: str | None = Field(None, description="Plain-language headline when nothing was built.")
+    not_split: list[NotSplitNote] = Field(..., description="Category groups not split, with the engine's reason.")
+
+
+class EmailPreviewResponse(BaseModel):
+    """Text preview of the draft customer email. Nothing is sent; there is no send capability."""
+
+    draft_only: Literal[True] = True
+    to: str
+    subject: str
+    body: str

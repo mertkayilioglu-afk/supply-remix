@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Container remix review</title>
+<meta name="description" content="Staged review of at-risk orders and container remix proposals. Synthetic data.">
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f6f7f5; --surface: #ffffff; --surface-2: #eef1ee; --text: #1b2430; --muted: #4f5b66;
+    --border: #d5dbd7; --accent: #0f6a63; --accent-text: #ffffff; --focus: #1d4ed8;
+    --ok: #13653c; --ok-bg: #e3f3ea; --nok: #8a3a12; --nok-bg: #fbeadf;
+    --bar: #0f6a63; --bar-nok: #b45309; --floor: #1b2430; --banner-bg: #fff4d6; --banner-text: #4a3500;
+    --shadow: 0 1px 2px rgba(0,0,0,.06), 0 1px 1px rgba(0,0,0,.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #11161b; --surface: #182029; --surface-2: #1f2a35; --text: #e7ecef; --muted: #a9b4bd;
+      --border: #2e3b47; --accent: #4cc3b5; --accent-text: #0b1916; --focus: #93b4ff;
+      --ok: #7bdca3; --ok-bg: #143323; --nok: #ffb58a; --nok-bg: #3a2216;
+      --bar: #4cc3b5; --bar-nok: #f59e0b; --floor: #e7ecef; --banner-bg: #3a3014; --banner-text: #ffe7a3;
+      --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--accent); }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 16px; }
+  .banner { background: var(--banner-bg); color: var(--banner-text); border-bottom: 1px solid var(--border); }
+  .banner .wrap { padding-top: 10px; padding-bottom: 10px; display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; }
+  .banner strong { font-size: 15px; }
+  .banner a { color: inherit; font-weight: 600; }
+  header h1 { font-size: 22px; margin: 18px 0 4px; letter-spacing: -0.01em; }
+  header p { margin: 0; color: var(--muted); max-width: 70ch; }
+  .steps { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; padding: 0; margin: 16px 0; }
+  .steps li { border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; color: var(--muted); background: var(--surface); font-size: 13px; }
+  .steps li[aria-current="step"] { border-color: var(--accent); color: var(--text); font-weight: 600; }
+  .steps li.done::before { content: "\2713\00a0"; }
+  .grid { display: grid; grid-template-columns: minmax(300px, 400px) 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; box-shadow: var(--shadow); min-width: 0; }
+  .panel h2 { font-size: 16px; margin: 0 0 4px; }
+  .panel .sub { color: var(--muted); margin: 0 0 12px; font-size: 13px; }
+  .controls { display: grid; gap: 10px; margin-bottom: 12px; }
+  label { font-size: 13px; color: var(--muted); display: grid; gap: 4px; }
+  input[type="date"], input[type="file"] { font: inherit; color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; max-width: 100%; }
+  button { font: inherit; cursor: pointer; }
+  .primary { background: var(--accent); color: var(--accent-text); border: 0; border-radius: 6px; padding: 9px 14px; font-weight: 600; }
+  .secondary { background: transparent; color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; }
+  button:disabled { opacity: .55; cursor: not-allowed; }
+  .orders { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; max-height: 70vh; overflow: auto; }
+  .order-btn { width: 100%; text-align: left; display: grid; grid-template-columns: 2.2em 1fr auto; gap: 2px 10px; align-items: center;
+               background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+  .order-btn:hover:not(:disabled) { border-color: var(--accent); }
+  .order-btn[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 4px 0 0 var(--accent); background: var(--surface-2); }
+  .order-btn .rank { color: var(--muted); font-variant-numeric: tabular-nums; grid-row: span 2; }
+  .order-btn .num { font-weight: 600; }
+  .order-btn .cust { color: var(--muted); font-size: 13px; grid-column: 2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .order-btn .coef { font-variant-numeric: tabular-nums; text-align: right; }
+  .order-btn .meta { grid-column: 3; text-align: right; font-size: 12px; }
+  .tag { display: inline-block; font-size: 11px; color: var(--muted); border: 1px dashed var(--border); border-radius: 4px; padding: 0 5px; }
+  .badge { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 1px 8px; border: 1px solid currentColor; white-space: nowrap; }
+  .badge.ok { color: var(--ok); background: var(--ok-bg); }
+  .badge.nok { color: var(--nok); background: var(--nok-bg); border-style: dashed; }
+  .empty { color: var(--muted); border: 1px dashed var(--border); border-radius: 8px; padding: 18px; text-align: center; }
+  .error { border: 1px solid var(--nok); background: var(--nok-bg); color: var(--text); border-radius: 8px; padding: 10px 12px; margin: 8px 0; }
+  .error strong { color: var(--nok); }
+  .plan-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; align-items: baseline; margin-bottom: 12px; }
+  .plan-head h2 { font-size: 18px; }
+  .facts { display: flex; flex-wrap: wrap; gap: 6px 18px; color: var(--muted); font-size: 13px; margin: 0; padding: 0; list-style: none; }
+  .facts b { color: var(--text); font-weight: 600; }
+  .why { border-left: 4px solid var(--accent); background: var(--surface-2); border-radius: 6px; padding: 10px 12px; margin: 0 0 14px; }
+  .why h3 { font-size: 13px; margin: 0 0 4px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .why p { margin: 0; }
+  .why .src { color: var(--muted); font-size: 12px; margin-top: 6px; }
+  .group-title { font-size: 14px; margin: 14px 0 8px; color: var(--muted); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
+  .card { border: 1px solid var(--border); border-radius: 8px; padding: 12px; background: var(--surface); display: grid; gap: 8px; }
+  .card.nok { border-style: dashed; }
+  .card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .card-top h4 { margin: 0; font-size: 14px; }
+  .bar { position: relative; height: 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; }
+  .bar .fill { position: absolute; inset: 0 auto 0 0; background: var(--bar); border-radius: 5px 0 0 5px; }
+  .card.nok .bar .fill { background: repeating-linear-gradient(135deg, var(--bar-nok) 0 6px, transparent 6px 9px), var(--bar-nok); opacity: .85; }
+  .bar .floor { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--floor); }
+  .fill-text { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  dl.kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 0; font-size: 13px; }
+  dl.kv dt { color: var(--muted); }
+  dl.kv dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+  details { font-size: 13px; }
+  summary { cursor: pointer; color: var(--accent); }
+  .tbl-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin-top: 6px; font-size: 12px; }
+  th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .notes { margin: 14px 0 0; padding: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+  .notes h3 { font-size: 14px; margin: 0 0 6px; }
+  .notes ul { margin: 0; padding-left: 18px; }
+  .notes li { margin: 4px 0; }
+  .headline { font-weight: 600; margin: 0 0 6px; }
+  .draft { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 14px; }
+  .draft h3 { font-size: 15px; margin: 0 0 4px; }
+  .draft .warn { font-size: 13px; color: var(--muted); margin: 0 0 8px; }
+  .draft pre { white-space: pre-wrap; word-break: break-word; background: var(--surface-2); border: 1px dashed var(--border); border-radius: 8px; padding: 12px; font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; margin: 8px 0 0; }
+  footer { color: var(--muted); font-size: 12px; padding: 24px 16px; text-align: center; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="banner" role="note">
+  <div class="wrap">
+    <strong>Synthetic data. Illustrative parameters.</strong>
+    <span>Nothing here is real company data, and nothing on this page can send anything.</span>
+    <a id="workflow-link" href="#">How this was built (AI workflow)</a>
+  </div>
+</div>
+
+<div class="wrap">
+  <header>
+    <h1>Container remix: review dashboard</h1>
+    <p id="mode-note"></p>
+  </header>
+
+  <ol class="steps" aria-label="Review steps">
+    <li id="st-1" aria-current="step">1 · Rank at-risk orders</li>
+    <li id="st-2">2 · Review one order's container plan</li>
+    <li id="st-3">3 · Preview the draft email (optional)</li>
+  </ol>
+
+  <div class="grid">
+    <section class="panel" aria-labelledby="h-step1">
+      <h2 id="h-step1">Step 1 · Ranked at-risk orders</h2>
+      <p class="sub">Highest criticality coefficient first. Pick <b>one</b> order to review.</p>
+      <div class="controls" id="step1-controls"></div>
+      <div id="step1-error" role="alert"></div>
+      <ul class="orders" id="orders" aria-label="At-risk orders"></ul>
+      <div class="empty" id="orders-empty">Nothing ranked yet. Run step 1 when you are ready.</div>
+    </section>
+
+    <section class="panel" aria-labelledby="h-step2" aria-live="polite" id="step2">
+      <h2 id="h-step2">Step 2 · Container plan</h2>
+      <div class="empty" id="plan-empty">Pick one order in step 1. Nothing is computed until you do.</div>
+      <div id="plan"></div>
+    </section>
+  </div>
+</div>
+<footer>Every figure on this page comes from the engine's output or from <code>app/config/</code>. <a id="repo-link" href="#">Source</a></footer>
+
+<script id="dashboard-data" type="application/json">/*__DASHBOARD_DATA__*/null</script>
+<script>
+(function () {
+  "use strict";
+  var DATA = JSON.parse(document.getElementById("dashboard-data").textContent);
+  var CFG = DATA.config, SNAP = DATA.snapshot, STATIC = CFG.mode === "static";
+  var state = { orderLines: null, asOf: null, ranked: null, selected: null };
+
+  // ---------- helpers (formatting only; never computing new figures) ----------
+  function el(tag, attrs, children) {
+    var n = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) {
+      if (k === "class") n.className = attrs[k];
+      else if (k === "text") n.textContent = attrs[k];
+      else n.setAttribute(k, attrs[k]);
+    });
+    (children || []).forEach(function (c) { if (c != null) n.appendChild(typeof c === "string" ? document.createTextNode(c) : c); });
+    return n;
+  }
+  function clear(n) { while (n.firstChild) n.removeChild(n.firstChild); return n; }
+  function pct(x) { return (x * 100).toFixed(1) + "%"; }
+  function money(x) { return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(x); }
+  function int(x) { return new Intl.NumberFormat("en-US").format(x); }
+  function dateText(d) { return d ? d : "To be confirmed"; }
+  function badge(status) {
+    var ok = status === "OK";
+    return el("span", { "class": "badge " + (ok ? "ok" : "nok") }, [
+      el("span", { "aria-hidden": "true", text: ok ? "✓" : "⧗" }),
+      ok ? "OK" : "NOK"
+    ]);
+  }
+  function setStep(n) {
+    [1, 2, 3].forEach(function (i) {
+      var li = document.getElementById("st-" + i);
+      if (i === n) li.setAttribute("aria-current", "step"); else li.removeAttribute("aria-current");
+      li.classList.toggle("done", i < n);
+    });
+  }
+  function showError(box, err) {
+    clear(box);
+    var d = el("div", { "class": "error" }, [el("strong", { text: err.stage ? err.stage + ": " : "Error: " }), err.detail || String(err)]);
+    box.appendChild(d);
+  }
+  function post(path, body) {
+    return fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+      .then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (j) {
+          if (!r.ok) throw { stage: j.stage, detail: j.detail ? (typeof j.detail === "string" ? j.detail : JSON.stringify(j.detail)) : ("HTTP " + r.status) };
+          return j;
+        });
+      });
+  }
+
+  // ---------- page chrome ----------
+  document.getElementById("workflow-link").href = CFG.workflow_url;
+  document.getElementById("repo-link").href = CFG.repo_url;
+  document.getElementById("mode-note").textContent = STATIC
+    ? "Static snapshot: the engine computed these results ahead of time (as of " + SNAP.as_of + ") for the ranked list and a few orders. Nothing is computed in your browser."
+    : "Live: each step calls the engine only when you click it. One stage at a time; no stage starts the next.";
+
+  // ---------- step 1 ----------
+  var controls = document.getElementById("step1-controls");
+  var runBtn;
+  if (STATIC) {
+    runBtn = el("button", { "class": "primary", type: "button", text: "Show ranked orders" });
+    controls.appendChild(runBtn);
+  } else {
+    var asOf = el("input", { type: "date", id: "as-of", value: CFG.as_of_default });
+    var file = el("input", { type: "file", id: "book", accept: "application/json,.json" });
+    controls.appendChild(el("label", { "for": "as-of" }, ["As-of date (the sample data was generated for this date)", asOf]));
+    controls.appendChild(el("label", { "for": "book" }, ["Order book JSON (optional; read in your browser only). Leave empty to use the bundled sample.", file]));
+    runBtn = el("button", { "class": "primary", type: "button", text: "Run step 1: rank at-risk orders" });
+    controls.appendChild(runBtn);
+  }
+
+  function loadOrderBook() {
+    var f = document.getElementById("book").files[0];
+    if (!f) return fetch("dashboard/sample-order-book").then(function (r) { return r.json(); });
+    return f.text().then(function (t) { return JSON.parse(t); });
+  }
+
+  runBtn.addEventListener("click", function () {
+    var errBox = clear(document.getElementById("step1-error"));
+    runBtn.disabled = true;
+    var job = STATIC ? Promise.resolve(SNAP.ranked) : loadOrderBook().then(function (book) {
+      state.orderLines = book.order_lines;
+      state.asOf = document.getElementById("as-of").value || null;
+      return post("analyze", { order_lines: state.orderLines, as_of_date: state.asOf });
+    });
+    job.then(function (res) { state.ranked = res; renderOrders(res); setStep(2); })
+       .catch(function (e) { showError(errBox, e); })
+       .then(function () { runBtn.disabled = false; });
+  });
+
+  function renderOrders(res) {
+    var list = clear(document.getElementById("orders"));
+    document.getElementById("orders-empty").hidden = res.at_risk_orders.length > 0;
+    if (!res.at_risk_orders.length) document.getElementById("orders-empty").textContent = "No orders are at risk.";
+    res.at_risk_orders.forEach(function (o, i) {
+      var inSnap = !STATIC || Object.prototype.hasOwnProperty.call(SNAP.plans, o.order_number);
+      var btn = el("button", { "class": "order-btn", type: "button", "aria-pressed": "false", "data-order": o.order_number }, [
+        el("span", { "class": "rank", text: String(i + 1) }),
+        el("span", { "class": "num", text: o.order_number }),
+        el("span", { "class": "coef", title: "Criticality coefficient", text: o.coefficient.toFixed(1) }),
+        el("span", { "class": "cust", text: o.customer_name }),
+        el("span", { "class": "meta" }, [badge(o.mix_status)])
+      ]);
+      btn.setAttribute("aria-label", o.order_number + ", " + o.customer_name + ", coefficient " + o.coefficient.toFixed(1) + ", status " + o.mix_status + (inSnap ? "" : ", not in this snapshot"));
+      if (!inSnap) {
+        btn.disabled = true;
+        btn.querySelector(".meta").appendChild(el("span", { "class": "tag", text: "live only" }));
+      }
+      btn.addEventListener("click", function () { selectOrder(o.order_number, btn); });
+      list.appendChild(el("li", null, [btn]));
+    });
+  }
+
+  // ---------- step 2 ----------
+  function selectOrder(orderNumber, btn) {
+    Array.prototype.forEach.call(document.querySelectorAll(".order-btn"), function (b) { b.setAttribute("aria-pressed", "false"); });
+    btn.setAttribute("aria-pressed", "true");
+    state.selected = orderNumber;
+    document.getElementById("plan-empty").hidden = true;
+    var plan = clear(document.getElementById("plan"));
+    plan.appendChild(el("p", { "class": "sub", text: "Computing the plan for " + orderNumber + "…" }));
+    var job = STATIC ? Promise.resolve(SNAP.plans[orderNumber])
+      : post("dashboard/plan", { order_lines: state.orderLines, target_order_number: orderNumber, as_of_date: state.asOf });
+    job.then(function (view) { if (state.selected === orderNumber) { renderPlan(view); setStep(2); } })
+       .catch(function (e) { showError(clear(plan), e); });
+  }
+
+  function renderPlan(view) {
+    var r = view.remix, plan = clear(document.getElementById("plan"));
+    var head = el("div", { "class": "plan-head" }, [
+      el("h2", { text: r.target_order_number + " · " + view.target.customer_name }),
+      el("ul", { "class": "facts" }, [
+        el("li", null, ["Requested ", el("b", { text: view.target.requested_delivery_date })]),
+        el("li", null, ["Order ready as one unit ", el("b", { text: dateText(view.target.availability_of_mix) })]),
+        el("li", null, ["Coefficient ", el("b", { text: r.target_order_coefficient.toFixed(1) })]),
+        el("li", null, ["Containers ", el("b", { text: String(r.containers.length) })])
+      ])
+    ]);
+    plan.appendChild(head);
+
+    plan.appendChild(el("div", { "class": "why" }, [
+      el("h3", { text: "Why this plan" }),
+      el("p", { text: view.explanation }),
+      el("p", { "class": "src", text: view.explanation_source === "model"
+        ? "Phrased by the AI model; any number not produced by the engine would have been rejected."
+        : "Deterministic template text from the assistant layer (no AI model involved)." })
+    ]));
+
+    if (!r.containers.length) {
+      plan.appendChild(el("div", { "class": "notes" }, [
+        el("p", { "class": "headline", text: view.no_proposal_headline || "No proposal." }),
+        r.no_proposal_reason === "no_candidates" && r.message ? el("p", { text: r.message }) : null,
+        notSplitList(view.not_split)
+      ]));
+    } else {
+      var groups = [];
+      r.containers.forEach(function (c) { if (groups.indexOf(c.category_group) < 0) groups.push(c.category_group); });
+      groups.forEach(function (g) {
+        if (groups.length > 1) plan.appendChild(el("h3", { "class": "group-title", text: g }));
+        var cards = el("div", { "class": "cards" });
+        r.containers.filter(function (c) { return c.category_group === g; })
+          .forEach(function (c) { cards.appendChild(containerCard(c)); });
+        plan.appendChild(cards);
+      });
+      if (view.not_split.length) {
+        plan.appendChild(el("div", { "class": "notes" }, [
+          el("h3", { text: "Partial proposal: not split" }), notSplitList(view.not_split)
+        ]));
+      }
+      plan.appendChild(draftSection(r.target_order_number));
+    }
+  }
+
+  function notSplitList(items) {
+    if (!items.length) return null;
+    var ul = el("ul");
+    items.forEach(function (n) {
+      ul.appendChild(el("li", null, [el("b", { text: n.categories + ": " }), "not split. " + n.detail]));
+    });
+    return ul;
+  }
+
+  function containerCard(c) {
+    var ok = c.status === "OK";
+    var bar = el("div", { "class": "bar", role: "img",
+      "aria-label": pct(c.utilization) + " full; minimum load " + pct(CFG.floor) });
+    var fill = el("div", { "class": "fill" }); fill.style.width = (Math.min(c.utilization, 1) * 100) + "%";
+    var floor = el("div", { "class": "floor", title: "Minimum load " + pct(CFG.floor) }); floor.style.left = "calc(" + (CFG.floor * 100) + "% - 1px)";
+    bar.appendChild(fill); bar.appendChild(floor);
+
+    var rows = el("tbody");
+    c.lines.forEach(function (l) {
+      rows.appendChild(el("tr", null, [
+        el("td", { text: l.order_number }), el("td", { text: l.sku }), el("td", { "class": "n", text: int(l.quantity) }),
+        el("td", { text: dateText(l.available_date) + (l.calendar_shifted_from ? " (moved from " + l.calendar_shifted_from + ")" : "") }),
+        el("td", null, [badge(l.line_status)]), el("td", { "class": "n", text: money(l.net_amount) })
+      ]));
+    });
+    var tbl = el("table", null, [
+      el("thead", null, [el("tr", null, ["Order", "SKU", "Qty", "Available", "Status", "Net"].map(function (h, i) {
+        return el("th", { "class": i === 2 || i === 5 ? "n" : "", scope: "col", text: h });
+      }))]), rows
+    ]);
+
+    return el("article", { "class": "card" + (ok ? "" : " nok"), "aria-label": "Container " + c.index + ", " + c.status }, [
+      el("div", { "class": "card-top" }, [el("h4", { text: "Container " + c.index }), badge(c.status)]),
+      bar,
+      el("div", { "class": "fill-text" }, [
+        el("span", { text: pct(c.utilization) + " full" }),
+        el("span", { text: c.total_cbm.toFixed(2) + " / " + CFG.capacity_cbm + " CBM · min " + pct(CFG.floor) })
+      ]),
+      el("dl", { "class": "kv" }, [
+        el("dt", { text: "Ready" }), el("dd", { text: dateText(c.availability_date) }),
+        el("dt", { text: "Units OK" }), el("dd", { text: int(c.ok_quantity) + " of " + int(c.total_quantity) }),
+        el("dt", { text: "Net Amount" }), el("dd", { text: money(c.net_amount) })
+      ]),
+      el("p", { "class": "sub", style: "margin:0", text: ok
+        ? "All units on time: can leave as soon as it is ready."
+        : "Holds late or unplanned units: waits for them, nothing is cancelled." }),
+      el("details", null, [el("summary", { text: "Contents (" + c.lines.length + (c.lines.length === 1 ? " line)" : " lines)") }), el("div", { "class": "tbl-wrap" }, [tbl])])
+    ]);
+  }
+
+  // ---------- step 3: draft preview only ----------
+  function draftSection(orderNumber) {
+    var box = el("section", { "class": "draft", "aria-labelledby": "h-step3" });
+    var out = el("div");
+    var btn = el("button", { "class": "secondary", type: "button", text: "Preview the draft customer email" });
+    box.appendChild(el("h3", { id: "h-step3", text: "Step 3 · Draft email preview (optional)" }));
+    box.appendChild(el("p", { "class": "warn", text: "Preview only. This page has no way to send email; the real draft is an .eml file a person reviews and sends themselves." }));
+    box.appendChild(btn);
+    box.appendChild(out);
+    btn.addEventListener("click", function () {
+      btn.disabled = true;
+      var job = STATIC ? Promise.resolve(SNAP.emails[orderNumber])
+        : post("dashboard/email-preview", { order_lines: state.orderLines, target_order_number: orderNumber, as_of_date: state.asOf });
+      job.then(function (d) {
+        clear(out);
+        if (d && d.error) { showError(out, d.error); return; }
+        out.appendChild(el("pre", { "aria-label": "Draft email preview" }, [
+          "DRAFT (not sent)\nTo: " + d.to + "\nSubject: " + d.subject + "\n\n" + d.body
+        ]));
+        setStep(3);
+      }).catch(function (e) { showError(clear(out), e); }).then(function () { btn.disabled = false; });
+    });
+    return box;
+  }
+})();
+</script>
+</body>
+</html>

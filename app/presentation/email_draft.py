@@ -66,6 +66,22 @@ def _build_body(result: RemixResult, target: OrderAnalysis, contact: Contact) ->
     return "\n".join(lines)
 
 
+def email_subject(target: OrderAnalysis) -> str:
+    return f"Your order {target.order_number} — proposal for an early partial shipment"
+
+
+def render_proposal_email_preview(
+    result: RemixResult, target: OrderAnalysis, contact: Contact
+) -> dict[str, str]:
+    """The draft's text for on-screen review (dashboard). Same body and subject as
+    the .eml; nothing is sent and no message object is created."""
+    return {
+        "to": f"{contact.contact_name} <{contact.email}>",
+        "subject": email_subject(target),
+        "body": _build_body(result, target, contact),
+    }
+
+
 def render_proposal_email(
     result: RemixResult,
     target: OrderAnalysis,
@@ -83,7 +99,7 @@ def render_proposal_email(
     msg = EmailMessage()
     msg["From"] = f"{_DEFAULT_SENDER_NAME} <{_DEFAULT_SENDER_EMAIL}>"
     msg["To"] = f"{contact.contact_name} <{contact.email}>"
-    msg["Subject"] = f"Your order {target.order_number} — proposal for an early partial shipment"
+    msg["Subject"] = email_subject(target)
     msg["Date"] = formatdate(localtime=True)
     msg["Message-ID"] = make_msgid()
     msg["X-Draft-Only"] = "true"  # explicit marker: this file was generated, never sent
