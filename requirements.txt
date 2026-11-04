@@ -1,0 +1,16 @@
+# Direct dependencies, pinned to versions verified on Python 3.11 and 3.12
+# (tests pass in clean virtualenvs on both). Transitive dependencies are not locked.
+fastapi==0.162.0
+uvicorn[standard]==0.54.0
+pandas==3.1.1
+pydantic==2.14.2
+openpyxl==3.1.5
+python-multipart==0.0.33
+anthropic==2.4.0
+# optional MILP packer (RemixConfig.packer="milp"); the greedy default needs none of this.
+# PuLP 4.x does not support Python 3.11, so 3.3.2 is used everywhere.
+pulp[cbc]==3.3.2
+cbcbox==2.935
+# tests
+pytest==9.2.0
+httpx==0.28.1

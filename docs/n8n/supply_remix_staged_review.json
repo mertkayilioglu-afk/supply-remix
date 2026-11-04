@@ -1,0 +1,607 @@
+{
+  "name": "supply-remix: staged review (UNTESTED DESIGN EXAMPLE)",
+  "nodes": [
+    {
+      "id": "29d5056d-5df4-5dfb-83d0-5e790a150868",
+      "name": "UNTESTED DESIGN EXAMPLE",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -260,
+        -360
+      ],
+      "parameters": {
+        "width": 520,
+        "height": 300,
+        "content": "## UNTESTED DESIGN EXAMPLE\n\nThis workflow has NOT been imported into or run in n8n. Node parameters may need fixing for your n8n version.\n\nIt shows the staged design: every API call after /analyze is gated by a human approval form. It never sends anything: the last step only SAVES a draft .eml file.\n\nSee docs/n8n/README.md."
+      }
+    },
+    {
+      "id": "ddb0956c-a5a9-53d9-bcde-9fffc09b7a96",
+      "name": "Weekday morning",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "31 7 * * 1-5"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "c0b69652-e159-53e5-a62f-3c268cb79c84",
+      "name": "Load order book",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "={{ $env.SUPPLY_REMIX_ORDER_BOOK }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "1032e3d2-8889-58f5-9264-3f9311a72a01",
+      "name": "Parse order book",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "operation": "fromJson",
+        "options": {}
+      }
+    },
+    {
+      "id": "9879eb5c-d1b9-55f3-8529-4a2171c53f3b",
+      "name": "Checkpoint 1: POST /analyze",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPPLY_REMIX_API_URL }}/analyze",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ order_lines: $json.data.order_lines }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "d05aab2c-1fc5-5fcc-95ec-efb13da8945f",
+      "name": "Summarise ranked list",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Formats the engine's own numbers; computes nothing new.\nconst orders = $json.at_risk_orders.slice(0, 10);\nconst lines = orders.map((o, i) => `${i + 1}. ${o.order_number} ${o.customer_name} coefficient ${o.coefficient.toFixed(1)}`);\nreturn [{ json: { text: `${$json.at_risk_orders.length} at-risk orders (as of ${$json.as_of_date}). Top 10:\\n` + lines.join('\\n') } }];"
+      }
+    },
+    {
+      "id": "1ec10eb6-2c11-51a6-ac97-af7e63f41176",
+      "name": "Notify planner: ranked list",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1100,
+        0
+      ],
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "={{ $env.SUPPLY_REMIX_SLACK_CHANNEL }}"
+        },
+        "text": "={{ $json.text }}\n\nPick ONE order to remix (or stop): {{ $execution.resumeFormUrl }}",
+        "otherOptions": {}
+      }
+    },
+    {
+      "id": "eee719c9-d027-501d-afa2-0ec405da5ad2",
+      "name": "Approval 1: planner picks ONE order",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1320,
+        0
+      ],
+      "parameters": {
+        "resume": "form",
+        "formTitle": "Remix one order?",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Order number",
+              "requiredField": true,
+              "placeholder": "SO-100203"
+            },
+            {
+              "fieldLabel": "Decision",
+              "fieldType": "dropdown",
+              "requiredField": true,
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Remix this order"
+                  },
+                  {
+                    "option": "Stop"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "227fe10f-42c0-5c56-9a18-56d88c24afa0",
+      "name": "Remix approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.Decision }}",
+              "rightValue": "Remix this order",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "d58d689a-b6a6-5653-a664-1c3f7c86ab7e",
+      "name": "Order is in the ranked list?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        -100
+      ],
+      "parameters": {
+        "jsCode": "// Fail visibly instead of remixing an order the ranking never showed.\nconst ranked = $('Checkpoint 1: POST /analyze').first().json.at_risk_orders.map(o => o.order_number);\nconst chosen = String($json['Order number']).trim().toUpperCase();\nif (!ranked.includes(chosen)) {\n  throw new Error(`Order ${chosen} is not in today's ranked at-risk list; nothing was remixed.`);\n}\nreturn [{ json: { order_number: chosen } }];"
+      }
+    },
+    {
+      "id": "b7bf2965-6075-50e1-9ed3-d40938b397a2",
+      "name": "Checkpoint 2: POST /remix",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1980,
+        -100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPPLY_REMIX_API_URL }}/remix",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ order_lines: $('Parse order book').first().json.data.order_lines, target_order_number: $json.order_number }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "c67b9319-4813-560d-aaec-dbe3c738080c",
+      "name": "Any containers?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        -100
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.containers.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "d9778351-2d77-5961-ab88-cd860be8581b",
+      "name": "Notify planner: no proposal",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        2420,
+        60
+      ],
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "={{ $env.SUPPLY_REMIX_SLACK_CHANNEL }}"
+        },
+        "text": "=No proposal for {{ $json.target_order_number }}: {{ $json.no_proposal_reason }}. {{ $json.message }}",
+        "otherOptions": {}
+      }
+    },
+    {
+      "id": "5d5e5b2d-13f6-50f4-8e3f-28bdd016de79",
+      "name": "Notify planner: container plan",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        2420,
+        -220
+      ],
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "={{ $env.SUPPLY_REMIX_SLACK_CHANNEL }}"
+        },
+        "text": "=Plan for {{ $json.target_order_number }}: {{ $json.containers.length }} containers.\n{{ $json.containers.map(c => `#${c.index} ${c.category_group} ${c.status} ${(c.utilization * 100).toFixed(1)}% ready ${c.availability_date || 'TBC'}`).join('\\n') }}\n{{ $json.message || '' }}\n\nReview, then decide whether to create a DRAFT email: {{ $execution.resumeFormUrl }}",
+        "otherOptions": {}
+      }
+    },
+    {
+      "id": "d6829fde-3a13-5052-980e-106e9944becd",
+      "name": "Approval 2: create a DRAFT customer email?",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2640,
+        -220
+      ],
+      "parameters": {
+        "resume": "form",
+        "formTitle": "Create a draft customer email?",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Decision",
+              "fieldType": "dropdown",
+              "requiredField": true,
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Create draft"
+                  },
+                  {
+                    "option": "Stop"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "488c0de0-7a69-5973-b0f8-d2d2f5d8485d",
+      "name": "Draft approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2860,
+        -220
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.Decision }}",
+              "rightValue": "Create draft",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "7bea9b08-907e-51d6-9c3e-559baf02e0ba",
+      "name": "Checkpoint 3: POST /remix/proposal-email.eml",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3080,
+        -300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SUPPLY_REMIX_API_URL }}/remix/proposal-email.eml",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ order_lines: $('Parse order book').first().json.data.order_lines, target_order_number: $('Order is in the ranked list?').first().json.order_number }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "8b657f22-bd7d-58c6-998f-f753ba45c17d",
+      "name": "Save DRAFT .eml (never sent)",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        3300,
+        -300
+      ],
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $env.SUPPLY_REMIX_DRAFTS_DIR }}/proposal_{{ $('Order is in the ranked list?').first().json.order_number }}.eml",
+        "dataPropertyName": "data",
+        "options": {}
+      }
+    },
+    {
+      "id": "e72584e7-5083-5d94-8e99-a2da6f358679",
+      "name": "Notify planner: draft saved",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        3520,
+        -300
+      ],
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "={{ $env.SUPPLY_REMIX_SLACK_CHANNEL }}"
+        },
+        "text": "=Draft saved (NOT sent): {{ $json.fileName }}. Open it in your mail client, review, and send it yourself if you agree.",
+        "otherOptions": {}
+      }
+    }
+  ],
+  "connections": {
+    "Weekday morning": {
+      "main": [
+        [
+          {
+            "node": "Load order book",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load order book": {
+      "main": [
+        [
+          {
+            "node": "Parse order book",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse order book": {
+      "main": [
+        [
+          {
+            "node": "Checkpoint 1: POST /analyze",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Checkpoint 1: POST /analyze": {
+      "main": [
+        [
+          {
+            "node": "Summarise ranked list",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarise ranked list": {
+      "main": [
+        [
+          {
+            "node": "Notify planner: ranked list",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify planner: ranked list": {
+      "main": [
+        [
+          {
+            "node": "Approval 1: planner picks ONE order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approval 1: planner picks ONE order": {
+      "main": [
+        [
+          {
+            "node": "Remix approved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Order is in the ranked list?": {
+      "main": [
+        [
+          {
+            "node": "Checkpoint 2: POST /remix",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Checkpoint 2: POST /remix": {
+      "main": [
+        [
+          {
+            "node": "Any containers?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify planner: container plan": {
+      "main": [
+        [
+          {
+            "node": "Approval 2: create a DRAFT customer email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approval 2: create a DRAFT customer email?": {
+      "main": [
+        [
+          {
+            "node": "Draft approved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Checkpoint 3: POST /remix/proposal-email.eml": {
+      "main": [
+        [
+          {
+            "node": "Save DRAFT .eml (never sent)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save DRAFT .eml (never sent)": {
+      "main": [
+        [
+          {
+            "node": "Notify planner: draft saved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remix approved?": {
+      "main": [
+        [
+          {
+            "node": "Order is in the ranked list?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any containers?": {
+      "main": [
+        [
+          {
+            "node": "Notify planner: container plan",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify planner: no proposal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft approved?": {
+      "main": [
+        [
+          {
+            "node": "Checkpoint 3: POST /remix/proposal-email.eml",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "meta": {
+    "note": "Untested design example. Never activated. See docs/n8n/README.md."
+  },
+  "tags": []
+}
