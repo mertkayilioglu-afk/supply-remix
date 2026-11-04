@@ -253,3 +253,92 @@ class TestPropertyOnGeneratedData:
             else:
                 assert r.no_proposal_reason in {"no_candidates", "insufficient_volume", "cannot_balance", "mixed"}
         assert built > 0
+
+
+def _dated_units(n: int, when: date | None, *, ok: bool, tag: str, cbm: float = 1.0) -> list[_Unit]:
+    """n identical units of one segment, available on `when` (None = UNPLANNED)."""
+    feedback = [confirmed(n, when)] if when is not None else [unplanned(n)]
+    seg = analyze_orders([line(f"SO-{tag}", f"SO-{tag}-L1", n, REQUESTED, feedback, cbm_per_unit=cbm)])[0].segments[0]
+    return [_Unit(seg, ok, cbm) for _ in range(n)]
+
+
+D0 = date(2026, 3, 2)
+LATER = date(2026, 5, 1)  # 60 days after D0
+
+
+class TestBalancingDelayGuard:
+    """Owner rule: a repair move or swap may not push a container's ready date more than
+    RemixConfig.max_balancing_delay_days past its ready date as the fill left it."""
+
+    def test_default_is_21_days(self) -> None:
+        assert RemixConfig().max_balancing_delay_days == 21
+
+    def _short_box_and_late_donor(self) -> list[list[_Unit]]:
+        # Box 1: 28 CBM ready D0 (short of the 28.35 floor). Box 2: 30 CBM ready 60 days later.
+        return [_dated_units(28, D0, ok=False, tag="A"), _dated_units(30, LATER, ok=False, tag="B")]
+
+    def test_move_that_would_delay_a_container_too_much_is_blocked(self) -> None:
+        boxes = self._short_box_and_late_donor()
+        _rebalance(boxes, floor=28.35, cap=30.0, max_delay_days=21)
+        assert [len(b) for b in boxes] == [28, 30]  # nothing moved: no legal repair
+        assert max(u.seg.available_date for u in boxes[0]) == D0
+
+    def test_same_move_is_allowed_within_the_limit_or_without_guard(self) -> None:
+        for limit in (60, None):
+            boxes = self._short_box_and_late_donor()
+            _rebalance(boxes, floor=28.35, cap=30.0, max_delay_days=limit)
+            assert _violation(boxes, 28.35, 30.0) == 0.0, limit
+
+    def test_both_sides_of_a_swap_are_guarded(self) -> None:
+        """Box 1 is fully OK (it can only swap). Swapping its 1.0 unit (ready D0) for a 0.5
+        unit ready 60 days later would fix box 2, but would delay box 1 by 60 days."""
+        box1 = _dated_units(30, D0, ok=True, tag="A")
+        box2 = _dated_units(27, D0, ok=False, tag="B") + _dated_units(2, LATER, ok=True, tag="C", cbm=0.5)
+        guarded = [list(box1), list(box2)]
+        _rebalance(guarded, floor=28.35, cap=30.0, max_delay_days=21)
+        assert max(u.seg.available_date for u in guarded[0]) == D0
+        assert _violation(guarded, 28.35, 30.0) > 0  # honest failure instead of a hidden delay
+        free = [list(box1), list(box2)]
+        _rebalance(free, floor=28.35, cap=30.0, max_delay_days=None)
+        assert _violation(free, 28.35, 30.0) == 0.0
+        assert max(u.seg.available_date for u in free[0]) == LATER
+
+    def test_unplanned_unit_never_moves_into_a_dated_container(self) -> None:
+        boxes = [_dated_units(28, D0, ok=False, tag="A"), _dated_units(30, None, ok=False, tag="U")]
+        _rebalance(boxes, floor=28.35, cap=30.0, max_delay_days=21)
+        assert all(u.seg.available_date == D0 for u in boxes[0])
+
+    def test_container_already_waiting_on_unplanned_accepts_any_unit(self) -> None:
+        boxes = [_dated_units(27, D0, ok=False, tag="A") + _dated_units(1, None, ok=False, tag="U"),
+                 _dated_units(30, LATER, ok=False, tag="B")]
+        _rebalance(boxes, floor=28.35, cap=30.0, max_delay_days=21)
+        assert _violation(boxes, 28.35, 30.0) == 0.0
+
+
+class TestSO100275SampleCase:
+    """The case that motivated the guard: on the sample data, container 1 of SO-100275 used to
+    hold 76 units ready 2026-03-03 plus ONE unit ready 2026-05-25, so all 77 waited 83 days."""
+
+    @staticmethod
+    def _container_1(cfg: RemixConfig):  # type: ignore[no-untyped-def]
+        import json
+        import pathlib
+
+        from app.api.main import _to_order_line
+        from app.api.schemas import AnalyzeRequest
+
+        book = json.loads((pathlib.Path(__file__).resolve().parents[1] / "data" / "sample_order_book.json").read_text())
+        analyses = analyze_orders([_to_order_line(l) for l in AnalyzeRequest.model_validate(book).order_lines])
+        return remix_order("SO-100275", analyses, cfg, as_of_date=date(2026, 4, 1)).containers
+
+    def test_without_guard_container_1_waits_83_days_for_one_unit(self) -> None:
+        c1 = self._container_1(RemixConfig(max_balancing_delay_days=None))[0]
+        assert c1.availability_date == date(2026, 5, 25)
+        assert sorted(l.quantity for l in c1.lines) == [1, 76]
+
+    def test_with_default_guard_container_1_ships_with_its_own_date(self) -> None:
+        containers = self._container_1(RemixConfig())
+        c1 = containers[0]
+        assert c1.availability_date == date(2026, 3, 3)
+        assert [(l.order_number, l.quantity, l.available_date) for l in c1.lines] == [("SO-100275", 77, date(2026, 3, 3))]
+        assert len(containers) == 12 and all(0.945 - 1e-9 <= c.utilization <= 1 + 1e-9 for c in containers)

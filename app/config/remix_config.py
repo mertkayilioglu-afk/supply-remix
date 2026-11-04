@@ -44,6 +44,20 @@ class RemixConfig:
     # cannot_balance with a message saying the time limit was hit.
     milp_time_limit_seconds: float = 10.0
 
+    # Guard on the REPAIR step only (not the first earliest-first fill): a
+    # balancing move or swap may not push a container's ready date more than
+    # this many days beyond its ready date as the fill left it. The reference is
+    # fixed at the start of the repair, so a chain of small moves cannot creep a
+    # container later and later. A container already waiting on an UNPLANNED unit
+    # has no ready date and accepts any unit; an UNPLANNED unit may not be moved
+    # into a dated container (that would make its ready date unknown).
+    #
+    # Default 21 days: the same window under which a delay already counts as OK
+    # (AnalysisConfig.status_tolerance_days). Balancing may cost a container
+    # up to the delay the business already tolerates, never more. Kept as a
+    # separate setting so the two can be tuned independently. None = no guard.
+    max_balancing_delay_days: int | None = 21
+
     # Whether a unit is OK is NOT configured here: it comes from
     # AnalysisConfig.status_tolerance_days, the same window the splitter uses,
     # so a container's OK/NOK status can never disagree with the order analysis.

@@ -1,6 +1,6 @@
 # CLAUDE.md -- project instructions for Claude Code
 
-Read README.md and docs/AI_WORKFLOW.md first, then run `python -m pytest -q` (expect 125 passing) before changing anything.
+Read README.md and docs/AI_WORKFLOW.md first, then run `python -m pytest -q` (expect 133 passing) before changing anything.
 
 ## What this is
 A self-directed personal portfolio project on synthetic data (never claim otherwise; no employer data). It rebuilds, in
@@ -17,7 +17,8 @@ engineering quality are.
    last one borrows from containers above without dropping them under the floor; a fully-OK container never donates. If volume
    cannot satisfy 94.5% x container count there is no proposal, with reason
    no_candidates | insufficient_volume | cannot_balance | mixed (groups failed for different reasons).
-   A fully-OK container may only swap units if it stays fully OK and within 94.5%-100%. Partial proposals are kept, and
+   A fully-OK container may only swap units if it stays fully OK and within 94.5%-100%. A repair move or swap may
+   not push a container's ready date more than RemixConfig.max_balancing_delay_days (21) past its post-fill date. Partial proposals are kept, and
    the document/email say which category is not split and why.
 4. Presentation: pivot (HTML/Excel), customer Excel document with a reconciliation check, draft .eml (never sent; no SMTP anywhere).
 

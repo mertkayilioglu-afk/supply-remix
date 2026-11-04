@@ -35,7 +35,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 
 from app.config.analysis_config import AnalysisConfig
 from app.config.remix_config import RemixConfig
@@ -221,7 +221,18 @@ def _violation(boxes: list[list[_Unit]], floor: float, cap: float) -> float:
     return sum(max(0.0, floor - _cbm(b)) + max(0.0, _cbm(b) - cap) for b in boxes)
 
 
-def _rebalance(boxes: list[list[_Unit]], floor: float, cap: float) -> None:
+def _ready_anchor(box: list[_Unit]) -> date | None:
+    """A container's ready date for the delay guard. None = no limit: the box is
+    empty, or already waits on an UNPLANNED unit (its ready date is unknown)."""
+    dates = [u.seg.available_date for u in box]
+    if not dates or any(d is None for d in dates):
+        return None
+    return max(dates)  # type: ignore[type-var]
+
+
+def _rebalance(
+    boxes: list[list[_Unit]], floor: float, cap: float, max_delay_days: int | None = None
+) -> None:
     """Repair containers outside [floor, cap] by moving units between them.
 
     Rules: a fully-OK container never gives a unit away. It may only swap one
@@ -229,7 +240,19 @@ def _rebalance(boxes: list[list[_Unit]], floor: float, cap: float) -> None:
     OK AND still within [floor, cap] (owner decision); borrowing from
     containers ABOVE (earlier) is tried first, and later ones only if that
     cannot fix it. A step is kept only if it strictly lowers the total
-    violation, so the loop always terminates."""
+    violation, so the loop always terminates.
+
+    Delay guard (``max_delay_days``, owner decision): a container that RECEIVES
+    a unit (by a move, or either side of a swap) may not end up ready more than
+    that many days after its ready date at the start of this repair."""
+    anchors = [_ready_anchor(b) for b in boxes]
+
+    def may_receive(i: int, unit: _Unit) -> bool:
+        if max_delay_days is None or anchors[i] is None:
+            return True
+        d = unit.seg.available_date
+        return d is not None and d <= anchors[i] + timedelta(days=max_delay_days)  # type: ignore[operator]
+
     for scope in ("above", "any"):
         for _ in range(5000):
             sizes = [_cbm(b) for b in boxes]
@@ -243,7 +266,7 @@ def _rebalance(boxes: list[list[_Unit]], floor: float, cap: float) -> None:
                 for j in donors:
                     lock = _fully_ok(boxes[j])
                     for ui, u in enumerate(boxes[j]):
-                        if not lock:  # plain move j -> k
+                        if not lock and may_receive(k, u):  # plain move j -> k
                             ck, cj = sizes[k] + u.cbm, sizes[j] - u.cbm
                             new = _violation_pair(sizes, k, j, ck, cj, floor, cap)
                             if new < cur - EPS and (best is None or new < best[0] - EPS):
@@ -251,6 +274,8 @@ def _rebalance(boxes: list[list[_Unit]], floor: float, cap: float) -> None:
                         for vi, v in enumerate(boxes[k]):  # swap u (in j) <-> v (in k)
                             if lock and not v.ok:
                                 continue
+                            if not (may_receive(k, u) and may_receive(j, v)):
+                                continue  # would delay a container beyond the guard
                             d = u.cbm - v.cbm
                             if abs(d) < EPS:
                                 continue
@@ -451,7 +476,7 @@ def remix_order(
         # still reach the floor everywhere; the first arrangement that works wins.
         for reserve in (0.0, 0.5, 1.0, 2.0, 3.0):
             boxes = _fill(units, n, cap, floor, reserve)
-            _rebalance(boxes, floor, cap)
+            _rebalance(boxes, floor, cap, config.max_balancing_delay_days)
             if _violation(boxes, floor, cap) <= EPS:
                 break
         if _violation(boxes, floor, cap) > EPS:

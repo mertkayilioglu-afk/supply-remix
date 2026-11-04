@@ -104,7 +104,7 @@ The question this project answers: *how would I rebuild an Excel/VBA/Power BI wo
 ```bash
 pip install -r requirements.txt
 python scripts/make_sample_data.py          # synthetic order book -> data/sample_order_book.json
-python -m pytest -q                         # 125 tests
+python -m pytest -q                         # 133 tests
 uvicorn app.api.main:app --reload           # interactive docs at http://127.0.0.1:8000/docs
 export ANTHROPIC_API_KEY=...                # optional: model-based routing and phrasing
 ```
@@ -153,5 +153,15 @@ tests/             unit tests, including a bounds property test on generated dat
 * **Repair-step behaviour to be aware of:** the last container borrows from containers *above* it first. Only if
   that cannot fix it (for example, every earlier container would drop under the floor) does the repair borrow from a
   *later* container. Tested in `tests/test_remix.py::TestBorrowing`.
+* **Balancing delay guard** (`RemixConfig.max_balancing_delay_days`, default 21 days): a repair move or swap may not
+  push a container's ready date more than 21 days past its ready date as the earliest-first fill left it (the first
+  fill itself is not restricted). 21 days is the same window under which a delay already counts as OK, so balancing
+  may cost a container at most the delay the business already tolerates. Why it exists: on the sample data, the
+  repair fixed a 0.0002 CBM shortfall in one container by swapping a unit ready 83 days later into container 1 of
+  SO-100275, so 76 on-time units would have waited for one. With the guard, container 1 ships on its own date and
+  the late unit goes to a container that was already ready within 21 days of it. On the sample data the guard
+  changes no outcome (still 23 built, 33 insufficient volume, 5 mixed) and no container count; it changes which
+  container holds which unit in 2 distinct plans (7 orders share them). Tested in
+  `tests/test_remix.py::TestBalancingDelayGuard` and `TestSO100275SampleCase`.
 * Whether a unit is OK inside a container is decided by the same `AnalysisConfig.status_tolerance_days` the splitter
   uses (there is no second tolerance setting to drift out of sync).
