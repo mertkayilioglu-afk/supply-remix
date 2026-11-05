@@ -7,6 +7,19 @@
 > or contacts are in this repo; customers, products, prices and dates are all generated. All numeric parameters
 > (thresholds, weights, capacities, tolerances) are illustrative defaults, configurable in `app/config/`.
 
+**In short**
+
+- **Problem:** a direct-to-customer order ships as one unit, so one late or unplanned line holds back goods that are already ready.
+- **Step 1, rank:** split every line by availability date and rank the at-risk orders with configurable weights.
+- **Step 2, remix:** for ONE order a planner picks, propose date-ordered containers, each within the fill limits.
+- **Step 3, draft:** a customer document and a draft email, never sent. A human reviews every step; no step starts the next.
+- **AI** routes a plain-language request to one step and explains the engine's output; it never decides, chains steps or computes numbers. **Start here: [docs/AI_WORKFLOW.md](docs/AI_WORKFLOW.md).**
+
+**Dashboard:** [static demo on GitHub Pages](https://mertkayilioglu-afk.github.io/supply-remix/dashboard/) *(placeholder: live once Pages is enabled)*,
+or `GET /dashboard` on the running API. [How it works](#dashboard).
+
+![Review dashboard: ranked at-risk orders on the left, the container plan for one chosen order on the right](docs/images/dashboard.png)
+
 > **The point of this repo is the workflow, not the proposal.** How the same problem is solved differently with AI
 > (reverse-engineering legacy VBA, rules as tested config, a safe natural-language layer) is in
 > [docs/AI_WORKFLOW.md](docs/AI_WORKFLOW.md). Start there.
@@ -84,6 +97,30 @@ Staging is deliberate, for two reasons: **trust** (a planner can verify each sta
 instead of passing a wrong answer downstream). The document stage also refuses to render if its units do not reconcile
 with the order.
 
+## Dashboard
+
+A small review page for the staged flow, from one template in two forms:
+
+* **Live:** `GET /dashboard` on the running API. Each step is a deliberate click that calls ONE stage:
+  rank at-risk orders (`/analyze`), then the container plan for the one order you pick (`/dashboard/plan`), then,
+  optionally, a text preview of the draft customer email (`/dashboard/email-preview`). Nothing runs on page load,
+  and no stage starts the next.
+* **Static:** `python scripts/build_static_dashboard.py` writes `docs/dashboard/index.html` with a pre-computed
+  snapshot of the sample data (the full ranking, plus plans for the top orders and one example of each outcome), so
+  it works on GitHub Pages without a server. A test checks the committed file matches a fresh build.
+* **GitHub Pages:** `https://mertkayilioglu-afk.github.io/supply-remix/dashboard/` *(placeholder: live once Pages is
+  enabled for the `main` branch, `/docs` folder).*
+
+What the page shows: ranked orders (order, customer, coefficient, status); one card per container with a fill bar
+that marks the minimum load, an OK/NOK badge (icon and text, not colour alone), ready date, units OK, and Net Amount;
+the plain-language reason when there is no proposal, and which category was not split in a partial one; and a
+"Why this plan" box with the assistant layer's explanation. Every figure comes from the engine or `app/config/`;
+the page itself contains none. There is no send button: the email appears only as a draft preview.
+
+Note: container numbers follow the engine's earliest-first fill order, not the ready date, so a later container can
+occasionally be ready before an earlier one. Balancing can move a unit between containers, but the balancing delay
+guard (see "Known limits and next steps") stops it from delaying any container by more than 21 days.
+
 ## Where AI fits
 
 The question this project answers: *how would I rebuild an Excel/VBA/Power BI workflow today with AI?*
@@ -110,30 +147,6 @@ export ANTHROPIC_API_KEY=...                # optional: model-based routing and 
 ```
 
 Example: `POST /remix` with the contents of `data/sample_order_book.json` plus `"target_order_number": "SO-100203"`.
-
-## Dashboard
-
-A small review page for the staged flow, from one template in two forms:
-
-* **Live:** `GET /dashboard` on the running API. Each step is a deliberate click that calls ONE stage:
-  rank at-risk orders (`/analyze`), then the container plan for the one order you pick (`/dashboard/plan`), then,
-  optionally, a text preview of the draft customer email (`/dashboard/email-preview`). Nothing runs on page load,
-  and no stage starts the next.
-* **Static:** `python scripts/build_static_dashboard.py` writes `docs/dashboard/index.html` with a pre-computed
-  snapshot of the sample data (the full ranking, plus plans for the top orders and one example of each outcome), so
-  it works on GitHub Pages without a server. A test checks the committed file matches a fresh build.
-* **GitHub Pages:** `https://mertkayilioglu-afk.github.io/supply-remix/dashboard/` *(placeholder: live once Pages is
-  enabled for the `main` branch, `/docs` folder).*
-
-What the page shows: ranked orders (order, customer, coefficient, status); one card per container with a fill bar
-that marks the minimum load, an OK/NOK badge (icon and text, not colour alone), ready date, units OK, and Net Amount;
-the plain-language reason when there is no proposal, and which category was not split in a partial one; and a
-"Why this plan" box with the assistant layer's explanation. Every figure comes from the engine or `app/config/`;
-the page itself contains none. There is no send button: the email appears only as a draft preview.
-
-Note: container numbers follow the engine's earliest-first fill order, not the ready date, so a later container can
-occasionally be ready before an earlier one. Balancing can move a unit between containers, but the balancing delay
-guard (see "Known limits and next steps") stops it from delaying any container by more than 21 days.
 
 ## Layout
 
