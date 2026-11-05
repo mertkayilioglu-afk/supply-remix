@@ -17,7 +17,7 @@ from app.presentation.contacts import Contact
 from app.presentation.email_draft import render_proposal_email
 from app.presentation.proposal_document import render_proposal_workbook
 from tests.test_remix import AS_OF, EARLY, LATE, MID, line
-from tests.test_splitter import REQUESTED, confirmed
+from tests.test_splitter import REQUESTED, confirmed, unplanned
 
 
 def build(lines, target):
@@ -38,6 +38,15 @@ def test_document_lists_every_container_with_status_and_fill() -> None:
     assert "OK" in text and "NOK" in text
     assert "% full" in text
     assert "Current plan" in text
+    assert "ready date to be confirmed" not in text  # every container here is dated
+
+    # UNPLANNED units: the order and its last container have no ready date yet.
+    result, target = build([line("SO-2", "SO-2-L1", 89, REQUESTED, [confirmed(30, EARLY), confirmed(29, MID), unplanned(30)])], "SO-2")
+    values = cells(render_proposal_workbook(result, target))
+    assert any(v.startswith("Today the order ships as one shipment, ready date to be confirmed ") for v in values)
+    assert any(v.startswith("Container 3 -- ") and " -- ready date to be confirmed -- " in v for v in values)
+    assert not any("ready To be confirmed" in v for v in values)
+    assert "To be confirmed" in values  # the Available date cell of an unplanned line is unchanged
 
 
 def test_original_order_number_and_net_amount_are_shown() -> None:

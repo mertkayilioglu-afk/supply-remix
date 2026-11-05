@@ -47,6 +47,11 @@ def date_text(d: date | None) -> str:
     return d.isoformat() if d else TBC
 
 
+def ready_text(d: date | None) -> str:
+    """"ready 2026-03-03", or "ready date to be confirmed" when the date is unknown (UNPLANNED)."""
+    return f"ready {d.isoformat()}" if d else "ready date to be confirmed"
+
+
 def failure_categories(result: RemixResult, failure: GroupFailure) -> list[str]:
     """The target order's own categories that belong to a failed group."""
     cats = sorted(c for c, g in result.category_group_of.items() if g == failure.group)
@@ -104,7 +109,7 @@ def _write_container(ws: Worksheet, row: int, c: ShipmentContainer) -> int:
     fill = _FILL_OK if c.status == "OK" else _FILL_NOK
     ws.cell(row=row, column=1, value=(
         f"Container {c.index} -- {c.reference} -- {c.status} -- "
-        f"ready {date_text(c.availability_date)} -- {c.utilization:.1%} full"
+        f"{ready_text(c.availability_date)} -- {c.utilization:.1%} full"
     )).font = _SEC
     for col in range(1, 8):
         ws.cell(row=row, column=col).fill = fill
@@ -144,7 +149,7 @@ def render_proposal_workbook(result: RemixResult, target: OrderAnalysis) -> byte
         ws.cell(row=row, column=col).fill = _FILL_INFO
     row += 1
     ws.cell(row=row, column=1, value=(
-        f"Today the order ships as one shipment, ready {date_text(target.availability_of_mix)} "
+        f"Today the order ships as one shipment, {ready_text(target.availability_of_mix)} "
         f"(status {target.mix_status}), {target.total_quantity:,} units, Net Amount ${target.total_amount:,.0f}."
     )).font = _BODY
     row += 2

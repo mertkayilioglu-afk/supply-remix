@@ -13,7 +13,7 @@ from app.presentation.contacts import Contact
 from app.presentation.email_draft import render_proposal_email
 from app.presentation.proposal_document import render_proposal_workbook
 from tests.test_remix import AS_OF, EARLY, LATE, MID, line
-from tests.test_splitter import REQUESTED, confirmed
+from tests.test_splitter import REQUESTED, confirmed, unplanned
 
 
 def draft():
@@ -28,7 +28,7 @@ def draft():
 def test_addressed_to_contact_and_subject_has_order() -> None:
     msg, _ = draft()
     assert "jamie.rossi@customerco.example.com" in msg["To"]
-    assert "SO-300" in msg["Subject"]
+    assert msg["Subject"] == "Your order SO-300 - proposal to split it into containers"
     assert msg["X-Draft-Only"] == "true"
 
 
@@ -44,6 +44,17 @@ def test_body_lists_containers_and_says_nothing_is_cancelled() -> None:
     body = msg.get_body(preferencelist=("plain",)).get_content()
     assert "Container 1" in body and "Container 3" in body
     assert "Nothing is cancelled" in body
+    assert "ready 2026-" in body and "date to be confirmed" not in body  # all containers here are dated
+
+    # With an UNPLANNED chunk the order and its last container have no ready date yet.
+    analyses = analyze_orders([line("SO-301", "SO-301-L1", 89, REQUESTED, [confirmed(30, EARLY), confirmed(29, MID), unplanned(30)])])
+    result = remix_order("SO-301", analyses, RemixConfig(), as_of_date=AS_OF)
+    contact = Contact("CUST-001", "Jamie Rossi", "jamie.rossi@customerco.example.com")
+    eml = render_proposal_email(result, analyses[0], contact, render_proposal_workbook(result, analyses[0]), "p.xlsx")
+    unplanned_body = message_from_bytes(eml, policy=policy.default).get_body(preferencelist=("plain",)).get_content()
+    assert "single shipment, ready date to be confirmed, because" in unplanned_body
+    assert "Container 3 (Dishwashers): ready date to be confirmed," in unplanned_body
+    assert "To be confirmed" not in unplanned_body
 
 
 def test_module_has_no_send_capability() -> None:

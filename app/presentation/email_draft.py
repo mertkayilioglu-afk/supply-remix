@@ -20,7 +20,7 @@ from email.utils import formatdate, make_msgid
 from app.core.remix import RemixResult
 from app.data.models import OrderAnalysis
 from app.presentation.contacts import Contact
-from app.presentation.proposal_document import date_text, unsplit_note
+from app.presentation.proposal_document import ready_text, unsplit_note
 
 _DEFAULT_SENDER_NAME = "Supply Planning Team"
 _DEFAULT_SENDER_EMAIL = "planning-team@example.com"  # placeholder -- replace with the real sender
@@ -29,8 +29,8 @@ _DEFAULT_SENDER_EMAIL = "planning-team@example.com"  # placeholder -- replace wi
 def _build_body(result: RemixResult, target: OrderAnalysis, contact: Contact) -> str:
     lines = [f"Dear {contact.contact_name},", ""]
     lines.append(
-        f"Your order {target.order_number} currently ships as a single shipment, ready "
-        f"{date_text(target.availability_of_mix)}, because it has to wait for its slowest item. "
+        f"Your order {target.order_number} currently ships as a single shipment, "
+        f"{ready_text(target.availability_of_mix)}, because it has to wait for its slowest item. "
         + (
             "To get you your goods sooner, we propose splitting it into the containers below, in order of availability. "
             "Nothing is cancelled: items that are still late or not yet planned are in their own containers and ship once they are ready."
@@ -47,7 +47,7 @@ def _build_body(result: RemixResult, target: OrderAnalysis, contact: Contact) ->
             else f"{c.total_quantity - c.ok_quantity} of {c.total_quantity} units still late or not yet planned"
         )
         lines.append(
-            f"  - Container {c.index} ({c.group}): ready {date_text(c.availability_date)}, "
+            f"  - Container {c.index} ({c.group}): {ready_text(c.availability_date)}, "
             f"{c.total_quantity:,} units, {c.utilization:.1%} full -- {state}."
         )
     if result.group_failures:
@@ -67,7 +67,7 @@ def _build_body(result: RemixResult, target: OrderAnalysis, contact: Contact) ->
 
 
 def email_subject(target: OrderAnalysis) -> str:
-    return f"Your order {target.order_number} — proposal for an early partial shipment"
+    return f"Your order {target.order_number} - proposal to split it into containers"
 
 
 def render_proposal_email_preview(

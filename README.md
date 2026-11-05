@@ -15,7 +15,7 @@
 - **Step 3, draft:** a customer document and a draft email, never sent. A human reviews every step; no step starts the next.
 - **AI** routes a plain-language request to one step and explains the engine's output; it never decides, chains steps or computes numbers. **Start here: [docs/AI_WORKFLOW.md](docs/AI_WORKFLOW.md).**
 
-**Dashboard:** [static demo on GitHub Pages](https://mertkayilioglu-afk.github.io/supply-remix/dashboard/) *(placeholder: live once Pages is enabled)*,
+**Dashboard:** [static demo on GitHub Pages](https://mertkayilioglu-afk.github.io/supply-remix/dashboard/),
 or `GET /dashboard` on the running API. [How it works](#dashboard).
 
 ![Review dashboard: ranked at-risk orders on the left, the container plan for one chosen order on the right](docs/images/dashboard.png)
@@ -108,8 +108,7 @@ A small review page for the staged flow, from one template in two forms:
 * **Static:** `python scripts/build_static_dashboard.py` writes `docs/dashboard/index.html` with a pre-computed
   snapshot of the sample data (the full ranking, plus plans for the top orders and one example of each outcome), so
   it works on GitHub Pages without a server. A test checks the committed file matches a fresh build.
-* **GitHub Pages:** `https://mertkayilioglu-afk.github.io/supply-remix/dashboard/` *(placeholder: live once Pages is
-  enabled for the `main` branch, `/docs` folder).*
+* **GitHub Pages:** `https://mertkayilioglu-afk.github.io/supply-remix/dashboard/`
 
 What the page shows: ranked orders (order, customer, coefficient, status); one card per container with a fill bar
 that marks the minimum load, an OK/NOK badge (icon and text, not colour alone), ready date, units OK, and Net Amount;
