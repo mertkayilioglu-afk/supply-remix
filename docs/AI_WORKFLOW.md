@@ -62,13 +62,15 @@ customer automatically.
 
 ## 5. Efficiency: what I can and cannot claim
 
-I will not invent a percentage. What I can state honestly:
-
-* **Build effort:** a rule change that would have meant reading and rewriting macros is a config edit plus a test run.
-* **Reliability:** logic is now covered by tests and has explicit failure messages, instead of silently producing a wrong sheet.
-* **Planner time:** the ranked list, the pivot and the draft email replace several manual steps. *(Fill in: time per week
-  the original tool saved, and your estimate of the additional saving, labelled clearly as an estimate.)*
-* **Original impact:** *(Fill in the real, verifiable figures from your previous role, only ones you are able to share.)*
+* **Original impact (previous role, my own figures, not reproducible from this repo):** the original tool brought roughly
+  EUR 1.5M of backorder orders under control, with an estimated saving potential of about EUR 170k per month, and reduced
+  manual work by about 3.5 hours per week. These figures come from the original VBA/Power Query tool and company data. They
+  cannot be verified here, and nothing in this repository measures money because the data is synthetic.
+* **Build effort:** the original took about two months to set up and depended on SAP extracts and Power Query steps. Here the
+  same logic is explicit configuration with tests, so a rule change is a config edit plus a test run, and a natural-language
+  layer sits on top. I have not measured the time saving of this version.
+* **Reliability:** logic is covered by tests and has explicit failure messages, instead of silently producing a wrong sheet.
+* **Planner time:** the ranked list, the dashboard and the draft email replace several manual steps. I have not measured it.
 
 ## 6. What I would do next with a real team
 
