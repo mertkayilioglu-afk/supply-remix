@@ -1,6 +1,6 @@
 # CLAUDE.md -- project instructions for Claude Code
 
-Read README.md and docs/AI_WORKFLOW.md first, then run `python -m pytest -q` (expect 146 passing) before changing anything.
+Read README.md and docs/AI_WORKFLOW.md first, then run `python -m pytest -q` (expect 149 passing) before changing anything.
 
 ## What this is
 A self-directed personal portfolio project on synthetic data (never claim otherwise; no employer data). It rebuilds, in

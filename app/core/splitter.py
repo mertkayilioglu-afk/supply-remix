@@ -20,6 +20,8 @@ Pipeline:
 
 from __future__ import annotations
 
+import math
+
 from collections import defaultdict
 from dataclasses import replace
 from datetime import date
@@ -286,8 +288,8 @@ def analyze_orders(
         recoverable_quantity = sum(ls.recoverable_quantity for ls in line_summaries)
         unplanned_quantity = sum(ls.unplanned_quantity for ls in line_summaries)
         delayed_quantity = total_quantity - on_time_quantity - unplanned_quantity
-        total_amount = sum(ls.total_amount for ls in line_summaries)
-        recoverable_amount = sum(ls.recoverable_amount for ls in line_summaries)
+        total_amount = math.fsum(ls.total_amount for ls in line_summaries)
+        recoverable_amount = math.fsum(ls.recoverable_amount for ls in line_summaries)
 
         first_seg = order_segments[0]
         analyses.append(

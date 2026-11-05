@@ -9,6 +9,8 @@ Step 3's remix, which only runs once a human has picked an order).
 
 from __future__ import annotations
 
+import math
+
 from dataclasses import dataclass
 from datetime import date
 from typing import Callable
@@ -51,7 +53,7 @@ def _aggregate_line_weights(
         if total_qty == 0:
             return 0.0
         return (
-            sum(weight_fn(ls) * ls.quantity for ls in order.line_summaries) / total_qty
+            math.fsum(weight_fn(ls) * ls.quantity for ls in order.line_summaries) / total_qty
         )
 
     raise StageError(
@@ -159,7 +161,7 @@ def score_order(
         "etd_proximity_or_backorder": _etd_proximity_component(order, config, as_of_date),
         "recoverable_quantity": _recoverable_quantity_component(order, config),
     }
-    coefficient = sum(breakdown.values())
+    coefficient = math.fsum(breakdown.values())
     return ScoredOrder(order=order, coefficient=coefficient, score_breakdown=breakdown)
 
 

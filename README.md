@@ -141,7 +141,7 @@ The question this project answers: *how would I rebuild an Excel/VBA/Power BI wo
 ```bash
 pip install -r requirements.txt
 python scripts/make_sample_data.py          # synthetic order book -> data/sample_order_book.json
-python -m pytest -q                         # 146 tests
+python -m pytest -q                         # 149 tests
 uvicorn app.api.main:app --reload           # API docs at /docs, review dashboard at /dashboard
 export ANTHROPIC_API_KEY=...                # optional: model-based routing and phrasing
 ```

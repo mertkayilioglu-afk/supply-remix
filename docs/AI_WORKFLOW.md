@@ -14,7 +14,7 @@ flexibility and trust.
 flowchart LR
     A["1. Extract legacy logic<br/>(AI reads VBA / Excel)"] --> B["2. Rules as config<br/>(human states the business rules)"]
     B --> C["3. Build in small steps<br/>(human reviews every output)"]
-    C --> D["4. Lock with tests<br/>(146 tests, property checks)"]
+    C --> D["4. Lock with tests<br/>(149 tests, property checks)"]
     D --> E["5. Add AI to the product<br/>(routes + explains only)"]
     E --> F["6. Human checkpoints<br/>(rank, container plan, send)"]
     C -. "domain corrections" .-> B
@@ -37,7 +37,7 @@ flowchart LR
    tool behaved in real use before keeping it.
 2. **Rules became configuration.** Every tunable value sits in `app/config/`. When the business rule changed (see below), the
    change was a rule edit plus tests, not a macro rewrite.
-3. **Tests as the safety net.** 146 tests, including a property test on generated data that every container stays within
+3. **Tests as the safety net.** 149 tests, including a property test on generated data that every container stays within
    94.5%-100%. AI wrote code quickly; the tests are what made that safe.
 4. **Fast iteration on domain feedback.** Examples from this project, each fixed in one working session:
    * Generated categories were not realistic for appliances, so I corrected them and the data was regenerated.

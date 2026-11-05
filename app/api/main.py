@@ -14,6 +14,8 @@ target order itself.
 
 from __future__ import annotations
 
+import math
+
 from datetime import date
 
 from fastapi import FastAPI, Form, HTTPException, Request
@@ -158,8 +160,8 @@ def _plant_breakdown(order: OrderAnalysis) -> list[PlantBreakdownEntry]:
             plant=plant,
             quantity=sum(ls.quantity for ls in lines),
             recoverable_quantity=sum(ls.recoverable_quantity for ls in lines),
-            total_amount=sum(ls.total_amount for ls in lines),
-            recoverable_amount=sum(ls.recoverable_amount for ls in lines),
+            total_amount=math.fsum(ls.total_amount for ls in lines),
+            recoverable_amount=math.fsum(ls.recoverable_amount for ls in lines),
         )
         for plant, lines in sorted(by_plant.items())
     ]

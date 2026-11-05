@@ -19,6 +19,8 @@ pipeline rationale in app/core/errors.py.
 
 from __future__ import annotations
 
+import math
+
 import html
 import json
 
@@ -201,7 +203,7 @@ def render_pivot_html(
             "customers": len(rows),
             "orders": sum(r.order_count for r in rows),
             "recoverable_units": sum(r.recoverable_quantity for r in rows),
-            "recoverable_amount": _fmt_amount(sum(r.recoverable_amount for r in rows)),
+            "recoverable_amount": _fmt_amount(math.fsum(r.recoverable_amount for r in rows)),
         }
 
     data_json = json.dumps(datasets).replace("</", "<\\/")

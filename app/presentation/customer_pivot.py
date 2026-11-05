@@ -10,6 +10,8 @@ first before drilling into a specific order.
 
 from __future__ import annotations
 
+import math
+
 from dataclasses import dataclass, field
 
 from app.api.schemas import AnalyzeResponse
@@ -97,8 +99,8 @@ def aggregate_by_customer(
                 continue
             qty = sum(e.quantity for e in matching)
             recoverable_qty = sum(e.recoverable_quantity for e in matching)
-            amount = sum(e.total_amount for e in matching)
-            recoverable_amount = sum(e.recoverable_amount for e in matching)
+            amount = math.fsum(e.total_amount for e in matching)
+            recoverable_amount = math.fsum(e.recoverable_amount for e in matching)
 
         bucket = buckets.setdefault(order.customer_id, _Bucket(customer_name=order.customer_name))
         bucket.order_numbers.append(order.order_number)

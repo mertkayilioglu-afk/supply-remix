@@ -166,7 +166,7 @@ def _expand(pool: list[OrderLineSegment], tolerance_days: int) -> list[_Unit]:
 
 
 def _cbm(units: list[_Unit]) -> float:
-    return sum(u.cbm for u in units)
+    return math.fsum(u.cbm for u in units)
 
 
 def _fill(units: list[_Unit], n: int, cap: float, floor: float, reserve: float = 0.0) -> list[list[_Unit]]:
@@ -218,7 +218,7 @@ def _fully_ok(box: list[_Unit]) -> bool:
 
 
 def _violation(boxes: list[list[_Unit]], floor: float, cap: float) -> float:
-    return sum(max(0.0, floor - _cbm(b)) + max(0.0, _cbm(b) - cap) for b in boxes)
+    return math.fsum(max(0.0, floor - _cbm(b)) + max(0.0, _cbm(b) - cap) for b in boxes)
 
 
 def _ready_anchor(box: list[_Unit]) -> date | None:
@@ -256,7 +256,7 @@ def _rebalance(
     for scope in ("above", "any"):
         for _ in range(5000):
             sizes = [_cbm(b) for b in boxes]
-            cur = sum(max(0.0, floor - c) + max(0.0, c - cap) for c in sizes)
+            cur = math.fsum(max(0.0, floor - c) + max(0.0, c - cap) for c in sizes)
             if cur <= EPS:
                 return
             best: tuple[float, str, int, int, int, int] | None = None
@@ -334,7 +334,7 @@ def _build_container(
         )
     lines.sort(key=lambda l: (l.available_date is None, l.available_date or date.max, l.order_number, l.segment_id))
     dates = [l.available_date for l in lines]
-    cbm = sum(l.cbm for l in lines)
+    cbm = math.fsum(l.cbm for l in lines)
     return ShipmentContainer(
         reference=ref,
         group=group,
@@ -346,7 +346,7 @@ def _build_container(
         status="OK" if all(l.is_ok for l in lines) else "NOK",
         ok_quantity=sum(l.quantity for l in lines if l.is_ok),
         total_quantity=sum(l.quantity for l in lines),
-        net_amount=sum(l.net_amount for l in lines),
+        net_amount=math.fsum(l.net_amount for l in lines),
     )
 
 
